@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Mosaic</title>
+  <link rel="stylesheet" href="shared/styles.css">
+</head>
+<body>
+  <nav class="menubar" id="menubar"><span class="brand">Mosaic</span></nav>
+  <div class="workspace">
+    <aside class="palette" id="palette" aria-label="Tools">
+      <button data-tool="select" aria-label="Select">
+        <svg viewBox="0 0 18 18"><path d="M4 2.5v12l3.2-3 2.3 5 2-.9-2.3-5H13.5z" stroke-linejoin="round"/></svg>
+      </button>
+      <button data-tool="region" aria-label="Region">
+        <svg viewBox="0 0 18 18"><rect x="2.5" y="3.5" width="13" height="11" stroke-dasharray="2.5 2"/></svg>
+      </button>
+      <div class="palette-sep"></div>
+      <button class="swatch" id="background" aria-label="Background" aria-haspopup="true"></button>
+      <div class="swatch-panel" id="background-panel" hidden>
+        <div class="swatch-panel-title">Background</div>
+        <div class="swatch-panel-hint">Fills areas left by Cut and Delete</div>
+        <div class="swatch-choices">
+          <button class="swatch" data-color="transparent" title="Transparent"></button>
+          <button class="swatch" data-color="#ffffff" title="White"></button>
+          <button class="swatch" data-color="#000000" title="Black"></button>
+          <label class="swatch swatch-custom" title="Custom color"><input type="color" id="background-custom"></label>
+        </div>
+      </div>
+    </aside>
+    <div class="stage" id="stage">
+      <canvas class="editor" id="editor" tabindex="0"></canvas>
+    </div>
+  </div>
+  <footer class="statusbar" id="statusbar">
+    <span class="zoom">
+      <span class="value" id="zoom-value">100%</span>
+      <button id="zoom-reset" title="Actual size (Ctrl+0)">1:1</button>
+      <button id="zoom-fit" title="Ctrl+1">Fit</button>
+    </span>
+    <span id="selection-info"></span>
+    <span class="hint">Wheel: zoom · Right-drag: pan · Right-click: arrange · Shift-click: multi-select · Double-click: crop</span>
+    <span class="message" id="message"></span>
+  </footer>
+  <script type="module" src="app/main.js"></script>
+</body>
+</html>
