@@ -1,5 +1,5 @@
 // Pointer interactions on the canvas: select, marquee, move, scale, crop,
-// region, pan and wheel zoom. The active tool (select or region) decides what
+// region, pan and wheel zoom. The active tool (select, region or text) decides what
 // a left-drag does; panning, zoom and crop mode work the same in every tool. Keyboard handling lives in main.js and calls into the
 // returned tools object.
 
@@ -11,7 +11,8 @@ const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 const CLICK_SLOP = 3; // screen px a right-button press may move and still count as a click
 
 // background(): the current background color (CSS color, or null for transparent).
-export function attachTools(canvas, doc, view, { onContextMenu = () => {}, background = () => null } = {}) {
+// onText(cp): a left press with the Text tool at canvas point cp.
+export function attachTools(canvas, doc, view, { onContextMenu = () => {}, background = () => null, onText = () => {} } = {}) {
   const state = { drag: null, space: false, tool: 'select' };
 
   // Drop the region when its sprite is no longer the sole selection or it no
@@ -111,6 +112,7 @@ export function attachTools(canvas, doc, view, { onContextMenu = () => {}, backg
       tools.exitCrop(true);
     }
 
+    if (state.tool === 'text') { onText(cp); return; }
     if (state.tool === 'region' && regionDown(e, cp)) return;
 
     const unit = doc.singleUnitSelected();
@@ -249,6 +251,7 @@ export function attachTools(canvas, doc, view, { onContextMenu = () => {}, backg
       setCursor(view.handleAt(sp.x, sp.y, rectOf(s)));
       return;
     }
+    if (state.tool === 'text') { setCursor('text'); return; }
     if (state.tool === 'region') {
       const sel = doc.selectedSprites();
       const s = sel.length === 1 && !sel[0].group ? sel[0] : null;
@@ -327,6 +330,10 @@ export function attachTools(canvas, doc, view, { onContextMenu = () => {}, backg
   });
 
   canvas.addEventListener('contextmenu', e => e.preventDefault());
+
+  // A press on the canvas focuses it after pointerdown has run, which would
+  // take focus from a text box the press just opened and place it at once.
+  canvas.addEventListener('mousedown', e => { if (state.tool === 'text' && e.button === 0) e.preventDefault(); });
 
   canvas.addEventListener('dblclick', e => {
     const sp = view.pointerPos(e);

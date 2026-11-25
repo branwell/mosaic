@@ -5,7 +5,7 @@ This document is authoritative for approved behavior. `README.md` is orientation
 ## 1. Principles
 
 - **Image Composer, not Photoshop.** The unit of work is a free-floating *sprite* on an infinite canvas, not a layer in a fixed frame. Composition is arrangement.
-- **Originals are never altered.** Every imported or pasted image is kept byte-for-byte. Scale is a display property. Only *crop*, the *region* operations (copy, cut, delete), *flatten* and *export* produce new pixels, and they create new assets rather than modifying existing ones.
+- **Originals are never altered.** Every imported or pasted image is kept byte-for-byte. Scale is a display property. Only *crop*, the *region* operations (copy, cut, delete), *placing text*, *flatten* and *export* produce new pixels, and they create new assets rather than modifying existing ones.
 - **Self-contained files.** A saved `.mmsc` reproduces the canvas exactly, on any machine, with no external references.
 - **Local and offline.** No network access beyond the browser talking to the local server on loopback. No outside dependencies at build or run time.
 - **Platform-aware shortcuts.** The modifier is ⌘ on macOS and Ctrl elsewhere; this document writes Ctrl. Wheel zooms, right or middle button pans, right-click opens the context menu.
@@ -59,12 +59,13 @@ All operations below are recorded on the undo stack unless stated otherwise.
 - **Clear region** (Cut or Delete with a region) gives the sprite a new PNG image of its visible pixels with the region filled with the background color (see 4.12) or, when the background is transparent, made fully transparent, and clears `crop`. The original image is not modified, and undo restores the sprite. Position and size are unchanged.
 - **Move region** gives the sprite a new PNG image of its visible pixels in which the region is first cleared as in Clear region, then its original pixels are drawn at the new position as a paste: drawn over what is there, so transparent parts of the moved pixels show the image beneath. Pixels moved past the image's edge are clipped off; the image does not grow. One undo step per drag. The region follows to the new position, clipped to the image. Clears `crop`; the original image is not modified.
 - **Paste pixels** creates a new sprite from copied region pixels (a new PNG image at the source resolution), placed over the canvas rectangle the region was copied from at the same display scale, appended on top and selected.
+- **Place text** creates a new PNG image of the typed text, drawn in one font, size and color at true pixel size and trimmed to the drawn pixels, and one sprite at natural size where the text box showed it, appended on top and selected. The text itself is not kept: from then on it is an ordinary image sprite.
 - **Group / Ungroup** set or clear `group` on the selected sprites.
 - **Bring to Front / Send to Back** move the selected sprites (keeping their relative order) to the end or start of the `sprites` array.
 - **Align** moves sprites so an edge or center matches the *reference* sprite, which is the first sprite that was selected. Variants: Left, Right, Top, Bottom, Horizontal Center, Vertical Center. Each moves along one axis only.
 - **Side by side (horizontal)** keeps the selected sprites in left-to-right order, leaves the leftmost where it is, and slides each of the others so its left edge touches the previous sprite's right edge. Vertical positions are untouched. **Stack (vertical)** is the same for top-to-bottom order. Groups participate as single units by their bounding box.
 - **Duplicate** creates copies of the selected sprites sharing the same images, offset by 20 px right and down, appended on top, and selects the copies.
-- **Copy / Paste (internal)** copies the selected sprites' records; paste creates copies as Duplicate does.
+- **Copy / Paste (internal)** copies the selected sprites' records; paste creates copies as Duplicate does. Copy also puts the selection on the system clipboard as one PNG, rendered as it appears (as Export Selection does), for pasting into other applications.
 - **Delete** removes the selected sprites. Images no longer referenced by any sprite are dropped when the document is saved (they stay in memory for undo).
 - **Flatten** replaces the selected sprites (two or more, or a group) with one new sprite: a new PNG image whose pixels are the selection rendered exactly as it appears, sized to the selection's bounding box, transparent wherever nothing was drawn, placed at the bounding box's top-left. Undo restores the original sprites.
 - **Undo / Redo** cover every operation above. The stack is per document and is cleared on New and Open.
@@ -114,8 +115,9 @@ The tool palette on the left of the canvas holds one button per tool; the active
 |---|---|---|
 | Select | V | Select, marquee, move and scale, as in 4.1–4.3. Double-click enters crop mode. |
 | Region | M | Select a rectangle of pixels in the selected sprite (see 4.11). Scale handles are hidden. |
+| Text | T | Open a text box at the click point (see 4.13). Scale handles are hidden. |
 
-The editor starts with Select. Shift-dragging inside the one selected sprite switches to Region (4.1); a press outside the selected sprite in Region switches back to Select (4.11). Pasting copied pixels switches to Select so the pasted sprite can be moved at once.
+The editor starts with Select. Shift-dragging inside the one selected sprite switches to Region (4.1); a press outside the selected sprite in Region switches back to Select (4.11). Pasting copied pixels and placing text switch to Select so the new sprite can be moved at once.
 
 Below the tools, separated by a line, the palette holds the background color swatch (see 4.12).
 
@@ -177,12 +179,12 @@ Menu **Arrange**: Group (Ctrl+G), Ungroup (Ctrl+Shift+U), Bring to Front (Ctrl+S
 
 | Gesture | Effect |
 |---|---|
-| Ctrl + C | With a region: copy its pixels to the internal clipboard and, as PNG, to the system clipboard. Otherwise copy the selected sprites (internal clipboard only). |
+| Ctrl + C | With a region: copy its pixels to the internal clipboard and, as PNG, to the system clipboard. Otherwise copy the selected sprites: their records to the internal clipboard and, as one PNG of the selection as it appears, to the system clipboard. |
 | Ctrl + X | With a region: copy it as Ctrl+C does, then clear it to the background color (see 4.12). |
-| Ctrl + V | If the system clipboard holds an image that Mosaic itself copied from a region, paste the internal clipboard (in place, see Paste pixels). If it holds any other image, import it as a new sprite at the view center. Otherwise, paste the internal clipboard. |
+| Ctrl + V | If the system clipboard holds an image that Mosaic itself copied, paste the internal clipboard: copied sprites as Duplicate does, region pixels in place (see Paste pixels). If it holds any other image, import it as a new sprite at the view center. Otherwise, paste the internal clipboard. |
 | Ctrl + D | Duplicate selection. |
 
-Mosaic recognises its own region copy by pixel size: Chrome re-encodes images it places on the system clipboard, so the bytes differ from what was copied. An outside image of exactly the same size is taken for Mosaic's own.
+Mosaic recognises its own copy by pixel size: Chrome re-encodes images it places on the system clipboard, so the bytes differ from what was copied. An outside image of exactly the same size is taken for Mosaic's own.
 
 ### 4.7 Navigation
 
@@ -250,6 +252,20 @@ The background color is what Cut and Delete leave in a region. It is an opaque c
 
 The swatch shows the current color, or a checkerboard when transparent; the current choice in the panel is outlined. The background is an editor setting, not part of the document: it is remembered in this browser (local storage) and is not saved in `.mmsc` files. It starts as transparent.
 
+### 4.13 Text
+
+The Text tool adds text as an image. Text is edited only while its box is open; once placed it is pixels like any other sprite.
+
+| Gesture (Text tool) | Effect |
+|---|---|
+| Left-click on the canvas | Open a text box with its top-left at the click point. A bar above it (below it near the top edge) holds the font, the size and the color. |
+| Type | Enter starts a new line. The box grows with the text and shows it at the current zoom in the chosen font, size and color. |
+| Change font, size or color | Applies to all of the box's text at once. |
+| Click the canvas, click outside the box, Escape, or Ctrl+Enter | Place the text (see Place text) and switch to Select with it selected. A box with no visible characters places nothing. |
+| Ctrl shortcuts other than text editing (for example Ctrl+S) | Place the text, then run the shortcut. Undo, redo, cut, copy, paste, select all and delete act on the text in the box. |
+
+Size is in canvas pixels, so text placed at size 32 is 32 pixels tall at 100% zoom however the view is zoomed while typing. Fonts are a fixed list of common families, each with a generic fallback, using what is installed on the machine; because the result is pixels, a placed text looks the same on a machine without that font. Line height is 1.25 times the size. Font, size and color are editor settings remembered in this browser (local storage), not part of the document; they start as the system sans-serif, 32 and white. Switching to another application while typing keeps the box open.
+
 ## 5. User interface
 
 - Full-window layout: a menu bar on top (File, Edit, Arrange, View), a narrow tool palette down the left edge (tools, then the background color swatch), the canvas filling the remainder, and a one-line status bar at the bottom (zoom readout, selection summary, transient messages).
@@ -281,8 +297,9 @@ frontend/app/document.js  model (images, sprites, groups), mutations, undo/redo,
 frontend/app/view.js      canvas rendering, zoom/pan transform, hit-testing, handle geometry
 frontend/app/tools.js     pointer interactions: select, marquee, move, scale, crop, pan
 frontend/app/arrange.js   align, side by side, stack, z-order, group/ungroup
-frontend/app/raster.js    render sprites to an offscreen canvas and encode PNG (flatten, exports, crop, region pixels)
+frontend/app/raster.js    render sprites to an offscreen canvas and encode PNG (flatten, exports, crop, region pixels, text)
 frontend/app/region.js    region geometry and the region operations (copy, clear, paste pixels)
+frontend/app/text.js      the Text tool's text box and options; places text as a new image sprite
 frontend/app/files.js     import (paste, drop, picker), open/save via File System Access API, recent files, API calls
 frontend/app/menu.js      menu bar, context menu and status bar DOM
 frontend/app/keymap.js    the shortcut table: action name -> key string(s); the one file to edit for bindings
@@ -315,6 +332,8 @@ The document module has no DOM or canvas dependency. The view converts between s
 - **Shift-drag inside the selected sprite starts a region; pressing outside it returns to Select.** Agreed 2026-11-21. The owner first asked for pressing Shift alone to switch tools; that would break Shift-click and Shift-marquee additive selection whenever a sprite is selected, so the switch happens on a Shift-drag that starts inside the one selected sprite, which had no useful meaning before. A Shift-click there still removes it from the selection. Returning to Select on any press outside the selected sprite keeps Shift-click and Shift-marquee working from the Region tool as well.
 - **Moving region pixels commits on every drag.** Added 2026-11-21. Each drag is one undo step that writes a new image, rather than a floating selection held until deselected; simpler, and nothing is lost between drags because the region follows the pixels. Pixels are clipped at the image edge, keeping the move "within the image", and land as a paste (composited over) so it matches Paste.
 - **Region copy goes to the system clipboard too**, so pixels can be pasted into other applications. Pasting back into Mosaic places the pixels where they were copied from.
+- **Sprite copy goes to the system clipboard too.** Agreed 2026-11-24. Copying sprites used to fill only the internal clipboard, so an older image left on the system clipboard (a screenshot, say) won the next paste. Copy now also writes the selection as one PNG: other applications receive the combined image, and Mosaic recognises its own copy and pastes the separate sprites. Whatever was copied last wins, as users expect.
+- **Text becomes an image when placed.** Agreed 2026-11-21: the owner does not need to edit text after placing it. Drawing it into a PNG leaves the document model, the `.mmsc` format and the backend unchanged, makes every existing operation work on text, and makes the file independent of installed fonts. The cost is that placed text cannot be edited, and scaling it up blurs like any image. Fonts come from a fixed list rather than the machine's full font list, which would need a permission prompt (Local Font Access API).
 - **No rotation yet.** Rotation complicates crop, alignment and flatten; deferred as a future feature.
 
 ## 9. Future features
@@ -324,7 +343,7 @@ Not in scope now; listed so they are not implemented by accident and so costly-t
 - Rotation (90° steps and free) and flip
 - Opacity per sprite
 - Snapping and smart guides while dragging
-- Text sprites
+- Editable text (kept as text after placing); bold, italic, alignment and per-character styling; choosing from every installed font
 - Pixel editing beyond crop and region clear (effects, color)
 - Region shapes other than rectangles (ellipse, lasso); regions spanning several sprites; resizing a region's outline after drawing it, or moving the outline without its pixels; nudging region pixels with the arrow keys; a floating selection that stays separate until committed
 - Bring Forward / Send Backward

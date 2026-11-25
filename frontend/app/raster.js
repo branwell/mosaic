@@ -66,6 +66,39 @@ export function movePixels(image, base, r, dx, dy, fill = null) {
   return { canvas, blob: toPngBlob(canvas) };
 }
 
+// Draw text in one style onto a canvas fitted to its ink, plus a pixel of
+// margin for antialiasing. The text's layout starts at (0, 0): line i fills
+// y from i * size * lineHeight, with the glyphs centered in the line as CSS
+// places them, so the result lands where the text box showed it. Returns the
+// canvas, its PNG bytes, and the canvas's offset (x, y) from the layout
+// origin; null if nothing would be drawn.
+export function renderText(text, { font, size, color }, lineHeight) {
+  const spec = `${size}px ${font}`;
+  const probe = new OffscreenCanvas(1, 1).getContext('2d');
+  probe.font = spec;
+  const lh = size * lineHeight;
+  let x1 = Infinity, y1 = Infinity, x2 = -Infinity, y2 = -Infinity;
+  const lines = text.split('\n').map((line, i) => {
+    const m = probe.measureText(line);
+    const baseline = i * lh + (lh - m.fontBoundingBoxAscent - m.fontBoundingBoxDescent) / 2 + m.fontBoundingBoxAscent;
+    if (line.trim()) {
+      x1 = Math.min(x1, -m.actualBoundingBoxLeft);
+      x2 = Math.max(x2, m.actualBoundingBoxRight);
+      y1 = Math.min(y1, baseline - m.actualBoundingBoxAscent);
+      y2 = Math.max(y2, baseline + m.actualBoundingBoxDescent);
+    }
+    return { line, baseline };
+  });
+  if (x1 === Infinity) return null;
+  const x = Math.floor(x1) - 1, y = Math.floor(y1) - 1;
+  const canvas = new OffscreenCanvas(Math.ceil(x2) + 1 - x, Math.ceil(y2) + 1 - y);
+  const ctx = canvas.getContext('2d');
+  ctx.font = spec;
+  ctx.fillStyle = color;
+  for (const l of lines) ctx.fillText(l.line, -x, l.baseline - y);
+  return { canvas, blob: toPngBlob(canvas), x, y };
+}
+
 export function toPngBlob(canvas) {
   return canvas.convertToBlob({ type: 'image/png' });
 }

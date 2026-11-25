@@ -73,6 +73,7 @@ export const keymap = {
   // Tools (also in the tool palette)
   toolSelect: 'V',
   toolRegion: 'M',
+  toolText: 'T',
 
   // Modes
   escape: 'Escape', // leave crop mode discarding changes; close menus; clear region, else selection

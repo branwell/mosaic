@@ -207,6 +207,73 @@ canvas.editor[data-cursor="move"] { cursor: move; }
 canvas.editor[data-cursor="grab"] { cursor: grab; }
 canvas.editor[data-cursor="grabbing"] { cursor: grabbing; }
 canvas.editor[data-cursor="crosshair"] { cursor: crosshair; }
+canvas.editor[data-cursor="text"] { cursor: text; }
+
+/* Text tool: a box at the click point, with its options above it. The font,
+   size and color come from the --text-* properties; --x/--y place it. */
+.text-editor {
+  position: absolute;
+  left: var(--x);
+  top: var(--y);
+  z-index: 20;
+}
+.text-editor[hidden] { display: none; }
+.text-editor textarea {
+  display: block;
+  min-width: 1em;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  outline: 1px dashed var(--accent);
+  outline-offset: 2px;
+  background: transparent;
+  color: var(--text-color);
+  font-family: var(--text-font);
+  font-size: var(--text-size);
+  font-weight: normal;
+  font-style: normal;
+  line-height: var(--text-line);
+  letter-spacing: normal;
+  white-space: pre;
+  overflow: hidden;
+  resize: none;
+  user-select: text;
+}
+.text-options {
+  position: absolute;
+  left: -3px;
+  bottom: calc(100% + 6px);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px;
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+  white-space: nowrap;
+}
+.text-editor.options-below .text-options { bottom: auto; top: calc(100% + 6px); }
+.text-options select, .text-options input[type="number"] {
+  height: 24px;
+  background: var(--bg);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  font: inherit;
+}
+.text-options input[type="number"] { width: 60px; padding: 0 4px; }
+.text-color {
+  position: relative;
+  display: block;
+  width: 24px;
+  height: 24px;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  background: var(--text-color);
+  cursor: pointer;
+}
+.text-color input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; border: 0; padding: 0; }
 canvas.editor[data-cursor="nw"], canvas.editor[data-cursor="se"] { cursor: nwse-resize; }
 canvas.editor[data-cursor="ne"], canvas.editor[data-cursor="sw"] { cursor: nesw-resize; }
 canvas.editor[data-cursor="n"], canvas.editor[data-cursor="s"] { cursor: ns-resize; }

@@ -8,11 +8,10 @@ Development is exploratory and incremental. Begin with minimal scaffolding and e
 
 When tradeoffs arise, prioritize:
 
-1. Data integrity and correctness (never lose or alter the user's original image bytes).
-2. Approved requirements and user-visible behavior.
-3. Security and safe operation (see **Operating constraints**).
-4. Simplicity, readability, and maintainability.
-5. Performance when required by an approved use case.
+1. Approved requirements and user-visible behavior.
+2. Security and safe operation (see **Operating constraints**).
+3. Simplicity, readability, and maintainability.
+4. Performance when required by an approved use case.
 
 ## Design approach
 
@@ -24,10 +23,10 @@ When tradeoffs arise, prioritize:
 
 ## Operating constraints
 
-These hold in every mode and are not up for silent revision:
+The following should be avoided are not up for silent revision.  They should only be recommended if avoiding these constraints would results in hacks or workarounds that violate simplicity and best practices.  They should NEVER be added unless explictly instructed.
 
-- **No network.** Runtime and build must not depend on internet access or external services. Nothing is loaded from a CDN. The only network traffic is the browser talking to the local server on loopback.
-- **No outside dependencies.** The Go backend uses the standard library only. The frontend is plain HTML, CSS and JavaScript with no build step. Ask before adding any library, module or tool; if one is approved, it is vendored into the repository.
+- **Avoid network.** Runtime and build should avoid depending on internet access or external services. Nothing is loaded from a CDN. The only network traffic is the browser talking to the local server on loopback.
+- **Avoid outside dependencies.** The Go backend uses the standard library only. The frontend is plain HTML, CSS and JavaScript. Ask before adding any library, module or tool; if one is approved, it is vendored into the repository.
 - **On-prem.** The application may run in a locked-down environment. Assume no package manager, no telemetry, and no outbound connections.
 - **Browser target.** Chrome or Edge (File System Access API). Other browsers are a future concern.
 
@@ -45,7 +44,6 @@ These hold in every mode and are not up for silent revision:
 - **Frontend:** pure HTML/CSS/JavaScript on Canvas 2D, served by the Go binary. `frontend/app/` is the editor; `frontend/shared/` holds styles and small utilities.
 - **Persistence:** files chosen by the user through the browser's file dialogs. No database. The `data/` folder is scratch space for local testing and is not committed.
 - **Separation of concerns.** The document model (sprites, groups, images, undo) knows nothing about the DOM or canvas. Rendering, pointer interaction and file I/O are separate modules. Keep visual styles in CSS, not assigned from JavaScript.
-- **Original bytes are sacred.** Imported and pasted images are stored and saved unmodified. Only flatten and export produce new pixels, and both create new assets rather than altering existing ones.
 
 Layout (verify the working tree before editing any listed path):
 

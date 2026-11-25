@@ -7,7 +7,8 @@ import { attachTools } from './tools.js';
 import * as arrange from './arrange.js';
 import * as files from './files.js';
 import * as region from './region.js';
-import { decodeImage } from './raster.js';
+import { decodeImage, renderSprites, toPngBlob } from './raster.js';
+import { attachTextEditor } from './text.js';
 import { createMenuBar, createContextMenu, createStatusBar } from './menu.js';
 import { buildKeymap, eventKeyName, formatKey, stripModifiers } from './keys.js';
 
@@ -19,7 +20,11 @@ const view = new View(canvas, doc);
 const tools = attachTools(canvas, doc, view, {
   onContextMenu: p => contextMenu.open(p.x, p.y),
   background: () => background,
+  // A press while a text box is open only places its text.
+  onText: cp => { if (text.isOpen) text.commit(); else text.open(cp); },
 });
+// Placed text is selected; switch to Select so it can be moved at once.
+const text = attachTextEditor({ doc, view, onPlaced: () => tools.setTool('select') });
 const status = createStatusBar({
   zoomValue: document.getElementById('zoom-value'),
   selectionInfo: document.getElementById('selection-info'),
@@ -105,7 +110,12 @@ const actions = {
   copy: () => {
     if (tools.region) { copyRegion(); return; }
     if (!hasSelection()) return;
-    clipboard = { kind: 'sprites', records: doc.selectedSprites().map(s => ({ ...s, crop: s.crop && { ...s.crop } })) };
+    const sel = doc.selectedSprites();
+    clipboard = { kind: 'sprites', records: sel.map(s => ({ ...s, crop: s.crop && { ...s.crop } })) };
+    // Other applications get the selection as one PNG; pasting it back into
+    // Mosaic is recognised and pastes the sprite records instead.
+    const rendered = renderSprites(doc, sel);
+    if (rendered) writeSystemImage(toPngBlob(rendered.canvas), rendered.box.w, rendered.box.h);
   },
   cut: () => {
     const r = tools.region;
@@ -151,6 +161,7 @@ const actions = {
 
   toolSelect: () => tools.setTool('select'),
   toolRegion: () => tools.setTool('region'),
+  toolText: () => tools.setTool('text'),
 
   escape: () => {
     if (tools.cropping) tools.exitCrop(false);
@@ -165,8 +176,14 @@ function copyRegion() {
   const s = doc.sprite(tools.region.id);
   clipboard = { kind: 'pixels', ...region.copyRegion(doc, s, tools.region) };
   const { image } = clipboard;
-  lastPixelWrite = { w: image.width, h: image.height };
-  navigator.clipboard.write([new ClipboardItem({ 'image/png': image.blob })]).catch(err => {
+  writeSystemImage(image.blob, image.width, image.height);
+}
+
+// Put a PNG (a Blob or a promise of one) on the system clipboard and remember
+// its size so a later paste can recognise it as Mosaic's own copy.
+function writeSystemImage(blob, w, h) {
+  lastPixelWrite = { w, h };
+  navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]).catch(err => {
     lastPixelWrite = null;
     status.message('Could not write to the system clipboard: ' + err.message, { error: true });
   });
@@ -321,9 +338,20 @@ document.getElementById('zoom-fit').addEventListener('click', () => run('fitAll'
 
 const panKey = keys.held.get('pan') || null;
 
+// Shortcuts that edit text keep their usual meaning inside a text field.
+const TEXT_FIELD_ACTIONS = new Set(['undo', 'redo', 'cut', 'copy', 'paste', 'selectAll', 'delete']);
+const isField = el => el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || el instanceof HTMLSelectElement;
+
 window.addEventListener('keydown', e => {
-  if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
   const name = eventKeyName(e);
+  if (isField(e.target)) {
+    // In the text box, other Ctrl shortcuts (Save, Export…) place the text
+    // first and then run, rather than reaching the browser.
+    const action = name && keys.bindings.get(name);
+    if (!text.contains(e.target) || !name?.startsWith('Ctrl+') || !action || TEXT_FIELD_ACTIONS.has(action)) return;
+    text.commit();
+    canvas.focus();
+  }
   if (!name) return;
   if (name === panKey) { if (!e.repeat) tools.setSpace(true); e.preventDefault(); return; }
   const action = keys.bindings.get(name);
@@ -344,6 +372,7 @@ window.addEventListener('blur', () => tools.setSpace(false));
 // ---- clipboard and drag-drop import ----
 
 document.addEventListener('paste', e => {
+  if (isField(e.target)) return; // plain text pasted into the text box
   const images = files.imageFilesFromDataTransfer(e.clipboardData);
   if (images.length) {
     e.preventDefault();

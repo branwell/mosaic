@@ -16,6 +16,9 @@
       <button data-tool="region" aria-label="Region">
         <svg viewBox="0 0 18 18"><rect x="2.5" y="3.5" width="13" height="11" stroke-dasharray="2.5 2"/></svg>
       </button>
+      <button data-tool="text" aria-label="Text">
+        <svg viewBox="0 0 18 18"><path d="M3.5 4.5v-1.5h11v1.5M9 3v12M6.5 15h5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
       <div class="palette-sep"></div>
       <button class="swatch" id="background" aria-label="Background" aria-haspopup="true"></button>
       <div class="swatch-panel" id="background-panel" hidden>
@@ -31,6 +34,14 @@
     </aside>
     <div class="stage" id="stage">
       <canvas class="editor" id="editor" tabindex="0"></canvas>
+      <div class="text-editor" id="text-editor" hidden>
+        <div class="text-options">
+          <select id="text-font" title="Font"></select>
+          <input type="number" id="text-size" step="1" title="Size in canvas pixels">
+          <label class="text-color" title="Color"><input type="color" id="text-color"></label>
+        </div>
+        <textarea id="text-input" wrap="off" spellcheck="false" rows="1" aria-label="Text"></textarea>
+      </div>
     </div>
   </div>
   <footer class="statusbar" id="statusbar">
