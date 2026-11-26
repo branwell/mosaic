@@ -1,7 +1,7 @@
 // Wiring: creates the document, view and tools, defines every action once,
 // and maps menus and keyboard shortcuts onto those actions.
 
-import { Document } from './document.js';
+import { Document, PALETTE_SIZE } from './document.js';
 import { View } from './view.js';
 import { attachTools } from './tools.js';
 import * as arrange from './arrange.js';
@@ -41,7 +41,7 @@ let lastPixelWrite = null;
 
 // Background color: what Cut and Delete leave in a region. A CSS hex color,
 // or null for transparent. An editor setting kept in this browser, not in the
-// document.
+// document; the custom colors to choose it from are in the document's palette.
 const BACKGROUND_KEY = 'mosaic.background';
 let background = loadBackground();
 
@@ -302,7 +302,21 @@ for (const b of palette.querySelectorAll('button[data-tool]')) {
 
 const bgButton = document.getElementById('background');
 const bgPanel = document.getElementById('background-panel');
-const bgCustom = document.getElementById('background-custom');
+const bgSlots = document.getElementById('background-slots');
+const bgPicker = document.getElementById('background-custom');
+// Clicks within this long of each other are a double-click; a click on a
+// filled slot waits this long before closing the panel so a second click can
+// still land and edit the slot instead.
+const DOUBLE_CLICK_MS = 300;
+let editingSlot = -1;   // palette slot the color picker is filling, or -1
+let closeTimer = 0;
+
+for (let i = 0; i < PALETTE_SIZE; i++) {
+  const b = document.createElement('button');
+  b.className = 'swatch';
+  b.dataset.slot = String(i);
+  bgSlots.append(b);
+}
 
 function showBackground() {
   bgButton.style.setProperty('--swatch', background || 'transparent');
@@ -313,10 +327,28 @@ function showBackground() {
     if (c) b.style.setProperty('--swatch', c);
     b.setAttribute('aria-checked', String(c === background));
   }
-  if (background) bgCustom.value = background;
+  for (const b of bgSlots.children) {
+    const c = doc.palette[Number(b.dataset.slot)];
+    b.dataset.empty = String(!c);
+    if (c) b.style.setProperty('--swatch', c); else b.style.removeProperty('--swatch');
+    b.setAttribute('aria-checked', String(c !== null && c === background));
+    b.title = c ? `${c}: click to use, double-click to change` : 'Empty: click to choose a color';
+  }
 }
 
-function closeBackgroundPanel() { bgPanel.hidden = true; }
+function closeBackgroundPanel() {
+  clearTimeout(closeTimer);
+  bgPanel.hidden = true;
+}
+
+// Open the browser's color picker to fill a palette slot. The picker input
+// moves into the slot so the picker opens beside it.
+function editSlot(i, slot) {
+  editingSlot = i;
+  bgPicker.value = doc.palette[i] || background || '#808080';
+  slot.append(bgPicker);
+  try { bgPicker.showPicker(); } catch { bgPicker.click(); }
+}
 
 bgButton.addEventListener('click', () => {
   bgPanel.hidden = !bgPanel.hidden;
@@ -329,13 +361,37 @@ for (const b of bgPanel.querySelectorAll('[data-color]')) {
     canvas.focus();
   });
 }
-bgCustom.addEventListener('input', () => setBackground(bgCustom.value));
+bgSlots.addEventListener('click', e => {
+  const slot = e.target.closest('[data-slot]');
+  if (!slot || e.target === bgPicker) return;
+  const i = Number(slot.dataset.slot);
+  clearTimeout(closeTimer);
+  if (!doc.palette[i]) { editSlot(i, slot); return; }
+  if (e.detail >= 2) { editSlot(i, slot); return; }
+  setBackground(doc.palette[i]);
+  closeTimer = setTimeout(() => { closeBackgroundPanel(); canvas.focus(); }, DOUBLE_CLICK_MS);
+});
+bgPicker.addEventListener('input', () => {
+  if (editingSlot < 0) return;
+  doc.setPaletteColor(editingSlot, bgPicker.value);
+  setBackground(bgPicker.value);
+});
+bgPicker.addEventListener('change', () => { editingSlot = -1; });
+document.getElementById('palette-save').addEventListener('click', () =>
+  run(() => files.savePalette(doc.palette, doc.name + '.mmscpal')));
+document.getElementById('palette-load').addEventListener('click', () => run(async () => {
+  const { palette, skipped } = await files.loadPalette();
+  doc.setPalette(palette);
+  if (skipped) status.message(`${skipped} palette entr${skipped === 1 ? 'y was' : 'ies were'} not loaded (only ${PALETTE_SIZE} #rrggbb colors fit)`);
+}));
 document.addEventListener('pointerdown', e => {
   if (!bgPanel.hidden && !bgPanel.contains(e.target) && e.target !== bgButton) closeBackgroundPanel();
 });
 window.addEventListener('keydown', e => {
   if (e.key === 'Escape' && !bgPanel.hidden) { closeBackgroundPanel(); canvas.focus(); e.stopImmediatePropagation(); }
 }, true);
+// The palette belongs to the document: New and Open replace it.
+doc.onChange(showBackground);
 showBackground();
 
 document.getElementById('zoom-reset').addEventListener('click', () => run('zoomReset'));

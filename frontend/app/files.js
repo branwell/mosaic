@@ -3,6 +3,7 @@
 // that packs and unpacks .mmsc archives.
 
 import { decodeImage, renderSprites, toPngBlob } from './raster.js';
+import { PALETTE_SIZE, normalizePalette } from './document.js';
 
 const EXT_BY_MIME = {
   'image/png': 'png', 'image/jpeg': 'jpg', 'image/gif': 'gif',
@@ -12,6 +13,8 @@ const MIME_BY_EXT = Object.fromEntries(Object.entries(EXT_BY_MIME).map(([m, e]) 
 
 const MMSC_TYPES = [{ description: 'Mosaic composition', accept: { 'application/x-mosaic': ['.mmsc'] } }];
 const PNG_TYPES = [{ description: 'PNG image', accept: { 'image/png': ['.png'] } }];
+const PALETTE_TYPES = [{ description: 'Mosaic palette', accept: { 'application/json': ['.mmscpal'] } }];
+const PALETTE_VERSION = 1;
 const IMAGE_TYPES = [{ description: 'Images', accept: { 'image/*': ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp', '.svg'] } }];
 
 const IMPORT_OFFSET = 20;
@@ -120,7 +123,7 @@ export async function openFile(doc, handle = null) {
     const dec = await decodeImage(blob);
     decoded.push({ id: im.id, ext: im.ext, width: dec.width, height: dec.height, blob, drawable: dec.drawable });
   }
-  doc.load({ images: decoded, sprites: d.sprites, view: d.view, name: stripExt(handle.name), handle });
+  doc.load({ images: decoded, sprites: d.sprites, view: d.view, palette: d.palette, name: stripExt(handle.name), handle });
   await addRecent(handle);
 }
 
@@ -158,6 +161,32 @@ export async function exportPng(doc, sprites, suggestedName) {
   const blob = await toPngBlob(rendered.canvas);
   const handle = await window.showSaveFilePicker({ types: PNG_TYPES, suggestedName });
   await writeHandle(handle, blob);
+}
+
+// ---- palette files (.mmscpal) ----
+// JSON: { "version": 1, "palette": ["#rrggbb" | null, ...] }, the same shape
+// as the document's palette. The picker id gives palettes their own start folder.
+
+export async function savePalette(palette, suggestedName) {
+  requireFileSystemAccess();
+  const handle = await window.showSaveFilePicker({ id: 'palette', types: PALETTE_TYPES, suggestedName });
+  const json = JSON.stringify({ version: PALETTE_VERSION, palette }, null, 2) + '\n';
+  await writeHandle(handle, new Blob([json], { type: 'application/json' }));
+}
+
+// Returns { palette, skipped }: the PALETTE_SIZE slots to load, and how many
+// entries were dropped (past the last slot, or not a #rrggbb color).
+export async function loadPalette() {
+  requireFileSystemAccess();
+  const [handle] = await window.showOpenFilePicker({ id: 'palette', types: PALETTE_TYPES, multiple: false });
+  const file = await handle.getFile();
+  let d;
+  try { d = JSON.parse(await file.text()); } catch { throw new Error(`${file.name} is not a Mosaic palette`); }
+  if (!d || !Array.isArray(d.palette) || !Number.isInteger(d.version)) throw new Error(`${file.name} is not a Mosaic palette`);
+  if (d.version > PALETTE_VERSION) throw new Error(`${file.name} was saved by a newer version of Mosaic`);
+  const palette = normalizePalette(d.palette);
+  const given = d.palette.filter(c => c !== null).length;
+  return { palette, skipped: given - palette.filter(Boolean).length };
 }
 
 // ---- recent files (IndexedDB holds the file handles) ----

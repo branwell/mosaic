@@ -3,6 +3,21 @@
 
 export const DOCUMENT_VERSION = 1;
 
+// Custom background colors saved with the document: a fixed number of slots,
+// each an opaque "#rrggbb" color or null when empty.
+export const PALETTE_SIZE = 20;
+
+export function normalizePalette(palette) {
+  const out = new Array(PALETTE_SIZE).fill(null);
+  if (Array.isArray(palette)) {
+    for (let i = 0; i < PALETTE_SIZE; i++) {
+      const c = palette[i];
+      if (typeof c === 'string' && /^#[0-9a-f]{6}$/i.test(c)) out[i] = c.toLowerCase();
+    }
+  }
+  return out;
+}
+
 export function newId() {
   const bytes = new Uint8Array(6);
   crypto.getRandomValues(bytes);
@@ -40,6 +55,7 @@ export class Document {
     /** @type {Array<{id:string, image:string, x:number, y:number, w:number, h:number, crop?:{x:number,y:number,w:number,h:number}, group?:string}>} */
     this.sprites = [];
     this.view = { zoom: 1, panX: 0, panY: 0 };
+    this.palette = normalizePalette(null);
     this.undoStack = [];
     this.redoStack = [];
     this.dirty = false;
@@ -214,6 +230,26 @@ export class Document {
 
   // ---- whole-document state ----
 
+  // Set one palette slot. Marks the document dirty but is not undoable: the
+  // color picker reports every intermediate color while it is dragged.
+  setPaletteColor(index, color) {
+    const c = normalizePalette([color])[0];
+    if (index < 0 || index >= PALETTE_SIZE || this.palette[index] === c) return;
+    this.palette[index] = c;
+    this.dirty = true;
+    this.emit();
+  }
+
+  // Replace every palette slot (Load Palette). Dirty but not undoable, like
+  // setPaletteColor.
+  setPalette(colors) {
+    const next = normalizePalette(colors);
+    if (next.every((c, i) => c === this.palette[i])) return;
+    this.palette = next;
+    this.dirty = true;
+    this.emit();
+  }
+
   contentRect() { return unionRect(this.sprites.map(rectOf)); }
 
   referencedImageIds() { return new Set(this.sprites.map(s => s.image)); }
@@ -226,17 +262,19 @@ export class Document {
       images: [...this.images.values()].filter(im => used.has(im.id))
         .map(im => ({ id: im.id, ext: im.ext, width: im.width, height: im.height })),
       sprites: this.sprites.map(s => ({ ...s })),
+      ...(this.palette.some(c => c) && { palette: [...this.palette] }),
     };
   }
 
   // Replace the whole document (after New or Open). images: array of image
-  // records already decoded; sprites: plain records; view: optional.
-  load({ images = [], sprites = [], view = null, name = 'Untitled', handle = null }) {
+  // records already decoded; sprites: plain records; view and palette: optional.
+  load({ images = [], sprites = [], view = null, palette = null, name = 'Untitled', handle = null }) {
     this.reset();
     for (const im of images) this.addImage(im);
     this.sprites = sprites.map(s => ({ ...s }));
     this.dissolveSmallGroups();
     if (view) this.view = { zoom: view.zoom || 1, panX: view.panX || 0, panY: view.panY || 0 };
+    this.palette = normalizePalette(palette);
     this.name = name;
     this.handle = handle;
     this.emit();

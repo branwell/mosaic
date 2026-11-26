@@ -28,8 +28,13 @@
           <button class="swatch" data-color="transparent" title="Transparent"></button>
           <button class="swatch" data-color="#ffffff" title="White"></button>
           <button class="swatch" data-color="#000000" title="Black"></button>
-          <label class="swatch swatch-custom" title="Custom color"><input type="color" id="background-custom"></label>
         </div>
+        <div class="swatch-grid" id="background-slots"></div>
+        <div class="swatch-panel-buttons">
+          <button id="palette-save" title="Save the custom colors to a palette file">Save Palette</button>
+          <button id="palette-load" title="Replace the custom colors with a palette file">Load Palette</button>
+        </div>
+        <input type="color" class="swatch-picker" id="background-custom" tabindex="-1" aria-hidden="true">
       </div>
     </aside>
     <div class="stage" id="stage">

@@ -41,6 +41,8 @@ Z-order is the order of the `sprites` array: later entries draw on top. New spri
 
 **Group** — a flat set of sprites that is selected, moved, scaled and aligned as one unit. Groups do not nest. A group is defined by the sprites that reference it; a group with fewer than two members is dissolved. Ungrouping removes the group id from its members.
 
+**Palette** — the document's custom background colors (see 4.12): 20 slots, each an opaque color (`#rrggbb`) or empty. A new document's slots are all empty. Changing a slot makes the document dirty but is not an operation: it is not on the undo stack.
+
 ### 2.2 Canvas and coordinates
 
 - The canvas is infinite. There is no frame, page or fixed export area.
@@ -92,7 +94,9 @@ images/<id>.<ext>   one entry per image asset, original bytes (stored, no compre
     { "id": "a1", "image": "k3f9", "x": 100, "y": 50, "w": 640, "h": 480 },
     { "id": "a2", "image": "k3f9", "x": 800, "y": 50, "w": 160, "h": 120,
       "crop": { "x": 0, "y": 0, "w": 320, "h": 240 }, "group": "g1" }
-  ]
+  ],
+  "palette": [ "#3a6ea5", null, "#c0392b", null, null, null, null, null, null, null,
+               null, null, null, null, null, null, null, null, null, null ]
 }
 ```
 
@@ -101,7 +105,21 @@ Rules:
 - Every `sprites[].image` must name an entry in `images`, and every `images[]` entry must have a file at `images/<id>.<ext>`. Unreferenced images are not written.
 - Groups have no record of their own; they exist through `sprites[].group`.
 - `view` is restored on open so the user sees what they saved.
+- `palette` is optional and written only when at least one slot is filled: an array of 20 entries, each `"#rrggbb"` or `null` for an empty slot. A missing `palette`, or an entry that is not a `#rrggbb` color, reads as empty slots.
 - Only the Go backend reads and writes the archive. The browser exchanges the parts (document plus image blobs) with it over the local API.
+
+### 3.1 Palette file: `.mmscpal`
+
+A palette file holds the custom background colors (see 4.12) on their own, so they can be moved between documents. It is UTF-8 JSON, read and written by the browser alone:
+
+```json
+{ "version": 1, "palette": [ "#3a6ea5", null, "#c0392b", null, null, null, null, null, null, null,
+                             null, null, null, null, null, null, null, null, null, null ] }
+```
+
+- `version` is an integer; readers refuse a higher version than they know.
+- `palette` has the same shape as the document's `palette`: one entry per slot, `"#rrggbb"` or `null`, so slot positions are kept. Save always writes all 20 slots.
+- On load, entries past the 20th and entries that are not `#rrggbb` colors are dropped and the status bar says how many; a file that is not JSON or lacks `version` and `palette` is refused.
 
 ## 4. Interaction model
 
@@ -245,12 +263,16 @@ The background color is what Cut and Delete leave in a region. It is an opaque c
 
 | Gesture | Effect |
 |---|---|
-| Click the background swatch in the tool palette | Open a small panel beside it with Transparent, White, Black and a custom color. Its tooltip names the current color. |
+| Click the background swatch in the tool palette | Open a small panel beside it: a row with Transparent, White and Black, and below it the document's 20 custom color slots in a grid five wide. Its tooltip names the current color. |
 | Click Transparent, White or Black | Set the background and close the panel. |
-| Click the custom color | Open the browser's color picker; the background follows the chosen color as it changes. |
+| Click an empty slot | Open the browser's color picker beside it; the slot fills with the chosen color and the background follows it as it changes. |
+| Click a filled slot | Set the background to its color and close the panel. |
+| Double-click a filled slot | Open the color picker to change the slot's color; the background follows it as it changes. |
+| Click Save Palette (below the slots) | Save the 20 slots to a `.mmscpal` file (see 3.1) through the browser's save dialog, suggesting the document's name. |
+| Click Load Palette | Choose a `.mmscpal` file; its colors replace all 20 slots, slot for slot, emptying slots the file leaves empty. Like changing a slot, it makes the document dirty and is not undoable. The background itself is unchanged. |
 | Click elsewhere or Escape | Close the panel. |
 
-The swatch shows the current color, or a checkerboard when transparent; the current choice in the panel is outlined. The background is an editor setting, not part of the document: it is remembered in this browser (local storage) and is not saved in `.mmsc` files. It starts as transparent.
+The panel stays open after Save Palette and Load Palette. The swatch shows the current color, or a checkerboard when transparent; the current choice in the panel is outlined, and an empty slot shows a dashed outline with a plus. A slot can be changed but not emptied. The custom colors are the document's palette (see 2.1) and are saved in `.mmsc` files. The background itself is an editor setting, not part of the document: it is remembered in this browser (local storage) and is not saved in `.mmsc` files. It starts as transparent.
 
 ### 4.13 Text
 
@@ -300,7 +322,7 @@ frontend/app/arrange.js   align, side by side, stack, z-order, group/ungroup
 frontend/app/raster.js    render sprites to an offscreen canvas and encode PNG (flatten, exports, crop, region pixels, text)
 frontend/app/region.js    region geometry and the region operations (copy, clear, paste pixels)
 frontend/app/text.js      the Text tool's text box and options; places text as a new image sprite
-frontend/app/files.js     import (paste, drop, picker), open/save via File System Access API, recent files, API calls
+frontend/app/files.js     import (paste, drop, picker), open/save via File System Access API, palette files, recent files, API calls
 frontend/app/menu.js      menu bar, context menu, status bar and Save changes dialog DOM
 frontend/app/keymap.js    the shortcut table: action name -> key string(s); the one file to edit for bindings
 frontend/app/keys.js      key-string normalizing, event naming, display formatting, keymap validation
@@ -330,6 +352,8 @@ The document module has no DOM or canvas dependency. The view converts between s
 - **Tool palette with Select and Region tools.** Added 2026-11-21 so pixel-level actions have a home without overloading the Select tool's gestures; further tools join the palette. Crop stays a mode entered from any tool rather than becoming a tool. Tools have single-letter shortcuts (V, M), following image-editor convention.
 - **Region inside one selected sprite, rectangle only.** The owner's choice: a region is "part of an image", so a sprite is selected first. A region spanning several sprites (copying a composite) and other shapes (ellipse, lasso) are not planned now. Cut and delete produce a new PNG with an alpha channel, so cleared pixels are transparent whatever the source format; like crop, they never modify the original image.
 - **Background color for cleared regions, transparent by default.** Added 2026-11-21 so it is visible and chosen what Cut and Delete leave behind. It is an editor setting kept in browser storage, like the active tool, rather than a document property, so the `.mmsc` format is unchanged and one choice carries across documents. Opaque or transparent only; the native color input has no alpha, and partial transparency was not asked for. It does not apply to flatten or export, whose empty areas stay transparent.
+- **Custom background colors are saved with the document.** Agreed 2026-11-26. The single custom color became a palette of 20 slots so colors chosen for a composition can be reused and travel with its file. The palette is an optional `document.json` field, so the format version stays 1 and the backend, which does not interpret it, is unchanged; files from earlier versions open with an empty palette. The selected background stays an editor setting, as above. Palette changes mark the document dirty but are not undoable, because the color picker reports every intermediate color while it is dragged. A filled slot is used with a click and changed with a double-click, so choosing a saved color does not open the picker; the panel waits a moment before closing after a click so the second click of a double-click can land.
+- **Palette files are Mosaic JSON (`.mmscpal`).** Agreed 2026-11-26, with Save Palette and Load Palette in the background panel. Chosen over the GIMP `.gpl` format, which other image tools read, because it keeps slot positions, including gaps, exactly as the document does. Loading replaces every slot rather than merging, as the owner asked. The file is read and written in the browser, since it is plain JSON and needs no packing; the backend is not involved. The file dialogs use their own remembered start folder, separate from documents.
 - **Shift-drag inside the selected sprite starts a region; pressing outside it returns to Select.** Agreed 2026-11-21. The owner first asked for pressing Shift alone to switch tools; that would break Shift-click and Shift-marquee additive selection whenever a sprite is selected, so the switch happens on a Shift-drag that starts inside the one selected sprite, which had no useful meaning before. A Shift-click there still removes it from the selection. Returning to Select on any press outside the selected sprite keeps Shift-click and Shift-marquee working from the Region tool as well.
 - **Moving region pixels commits on every drag.** Added 2026-11-21. Each drag is one undo step that writes a new image, rather than a floating selection held until deselected; simpler, and nothing is lost between drags because the region follows the pixels. Pixels are clipped at the image edge, keeping the move "within the image", and land as a paste (composited over) so it matches Paste.
 - **Region copy goes to the system clipboard too**, so pixels can be pasted into other applications. Pasting back into Mosaic places the pixels where they were copied from.
