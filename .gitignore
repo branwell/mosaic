@@ -33,4 +33,6 @@ go.work.sum
 # .idea/
 # .vscode/
 
+# AVS
 .DS_store
+_ignore/
