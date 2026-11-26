@@ -81,8 +81,11 @@ export function pack(doc, axis) {
 
 // Insert copies of the given sprite records on top, offset, and select them.
 // Groups are re-keyed so copies form their own groups.
-export function pasteRecords(doc, records) {
+// images: the records' image assets, added when the document lacks them
+// (records copied from a document since replaced by New or Open).
+export function pasteRecords(doc, records, images = []) {
   if (records.length === 0) return;
+  for (const im of images) if (!doc.images.has(im.id)) doc.addImage(im);
   doc.commit(() => {
     const groups = new Map();
     const ids = [];

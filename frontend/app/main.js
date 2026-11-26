@@ -32,7 +32,7 @@ const status = createStatusBar({
 });
 const saveDialog = createSaveDialog(document.getElementById('save-dialog'));
 
-// Internal clipboard: {kind: 'sprites', records} or {kind: 'pixels', image,
+// Internal clipboard: {kind: 'sprites', records, images} or {kind: 'pixels', image,
 // rect} (see region.copyRegion), or null.
 let clipboard = null;
 // Size of the last image Mosaic put on the system clipboard, to recognise it
@@ -118,7 +118,9 @@ const actions = {
     if (tools.region) { copyRegion(); return; }
     if (!hasSelection()) return;
     const sel = doc.selectedSprites();
-    clipboard = { kind: 'sprites', records: sel.map(s => ({ ...s, crop: s.crop && { ...s.crop } })) };
+    // The images travel with the records so a paste works after New or Open.
+    const images = [...new Set(sel.map(s => s.image))].map(id => doc.images.get(id));
+    clipboard = { kind: 'sprites', records: sel.map(s => ({ ...s, crop: s.crop && { ...s.crop } })), images };
     // Other applications get the selection as one PNG; pasting it back into
     // Mosaic is recognised and pastes the sprite records instead.
     const rendered = renderSprites(doc, sel);
@@ -131,7 +133,7 @@ const actions = {
     region.clearRegion(doc, doc.sprite(r.id), r, background);
   },
   paste: () => {
-    if (clipboard?.kind === 'sprites') arrange.pasteRecords(doc, clipboard.records);
+    if (clipboard?.kind === 'sprites') arrange.pasteRecords(doc, clipboard.records, clipboard.images);
     else if (clipboard?.kind === 'pixels') { tools.setTool('select'); region.pastePixels(doc, clipboard); }
   },
   duplicate: () => arrange.duplicateSelected(doc),
