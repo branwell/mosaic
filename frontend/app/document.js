@@ -23,8 +23,9 @@ export function unionRect(rects) {
   return { x: x1, y: y1, w: x2 - x1, h: y2 - y1 };
 }
 
-export function rectsIntersect(a, b) {
-  return a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+// True when rect a lies entirely inside rect b (touching edges counts).
+export function rectInside(a, b) {
+  return a.x >= b.x && a.y >= b.y && a.x + a.w <= b.x + b.w && a.y + a.h <= b.y + b.h;
 }
 
 export class Document {

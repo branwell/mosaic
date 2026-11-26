@@ -54,6 +54,18 @@
     <span class="hint">Wheel: zoom · Right-drag: pan · Right-click: arrange · Shift-click: multi-select · Double-click: crop</span>
     <span class="message" id="message"></span>
   </footer>
+  <dialog class="dialog" id="save-dialog" aria-labelledby="save-dialog-title">
+    <form method="dialog">
+      <p class="dialog-title" id="save-dialog-title"></p>
+      <p class="dialog-text">Your changes will be lost if you don't save them.</p>
+      <div class="dialog-buttons">
+        <button value="discard">Don't Save</button>
+        <span class="dialog-spacer"></span>
+        <button value="cancel">Cancel</button>
+        <button value="save" class="primary" autofocus>Save</button>
+      </div>
+    </form>
+  </dialog>
   <script type="module" src="app/main.js"></script>
 </body>
 </html>

@@ -128,7 +128,7 @@ Below the tools, separated by a line, the palette holds the background color swa
 | Left-click a sprite | Select it alone. If it is in a group, select the whole group. |
 | Shift + left-click | Add to or remove from the selection (whole group if grouped). |
 | Shift + left-drag inside the one selected sprite | Switch to the Region tool and draw a region (see 4.11). Applies when exactly one ungrouped sprite is selected and the press starts inside it; a press that moves no more than a few pixels is a Shift-click instead. Starting on a handle still scales. |
-| Left-drag on empty canvas | Marquee; sprites whose bounds intersect the marquee are selected on release. Shift adds to the existing selection. |
+| Left-drag on empty canvas | Marquee; sprites whose bounds lie entirely inside the marquee are selected on release, and a group only when all its members do. Shift adds to the existing selection. |
 | Left-click empty canvas | Clear selection. |
 | Ctrl + A | Select all. |
 | Right-click | Context menu; see Arranging. |
@@ -216,7 +216,7 @@ Menu **File**: New (no shortcut; browsers reserve Ctrl+N), Open (Ctrl+O), Open R
 
 - Open and Save As use the browser's native file dialogs (`showOpenFilePicker`, `showSaveFilePicker`) with the `.mmsc` type suggested. Save writes to the handle retained from Open or Save As; a never-saved document falls back to Save As.
 - Export PNG renders the bounding box of all sprites; Export Selection as PNG renders the bounding box of the selection. Both are transparent where nothing is drawn, at true pixel size, and go through a save dialog suggesting a `.png` name.
-- The document is *dirty* after any undoable operation and clean after Save, Save As, New or Open. Closing or reloading a dirty tab prompts the browser's leave-page warning. New and Open on a dirty document ask for confirmation first.
+- The document is *dirty* after any undoable operation and clean after Save, Save As, New or Open. Closing or reloading a dirty tab prompts the browser's leave-page warning (its wording is the browser's own). New, Open and Open Recent on a dirty document first ask *Save changes to name.mmsc?* with Save (the default, on Enter), Don't Save and Cancel; Escape cancels. Save saves as Save does, and cancelling its Save As dialog cancels the New or Open as well.
 - Open Recent lists the last ten file handles stored in the browser's IndexedDB. Chrome may ask for permission again before reading one.
 - The window title is `name.mmsc — Mosaic`, with a leading `•` when dirty.
 
@@ -301,7 +301,7 @@ frontend/app/raster.js    render sprites to an offscreen canvas and encode PNG (
 frontend/app/region.js    region geometry and the region operations (copy, clear, paste pixels)
 frontend/app/text.js      the Text tool's text box and options; places text as a new image sprite
 frontend/app/files.js     import (paste, drop, picker), open/save via File System Access API, recent files, API calls
-frontend/app/menu.js      menu bar, context menu and status bar DOM
+frontend/app/menu.js      menu bar, context menu, status bar and Save changes dialog DOM
 frontend/app/keymap.js    the shortcut table: action name -> key string(s); the one file to edit for bindings
 frontend/app/keys.js      key-string normalizing, event naming, display formatting, keymap validation
 frontend/shared/styles.css dark theme tokens and layout
@@ -319,6 +319,7 @@ The document module has no DOM or canvas dependency. The view converts between s
 - **Default port 47615, with ordered fallback.** An uncommon port below the macOS ephemeral range (49152 and up) rarely collides. When it is busy, the server first checks whether the holder is Mosaic (by its `X-Mosaic` header) and, if so, reports the address and exits rather than running twice. Otherwise it tries the next nine ports in order. Ordered rather than random fallback keeps the origin, and with it the browser's per-origin Open Recent list, stable from run to run. An explicit `-addr` is used exactly, since the user chose it. Chosen 2026-11-21.
 - **Destructive crop, applied on leaving crop mode.** Replaced non-destructive crop (a stored source rectangle) on 2026-11-21 at the owner's request: cropping should actually remove the cropped parts. Like flatten, it creates a new image rather than editing the original, so originals stay byte-for-byte and undo works. The new image is always PNG: lossless, at the cost of larger files than a JPEG source; re-encoding as JPEG would degrade quality on every crop. The `crop` field stays readable so sprites saved with a stored crop still open correctly.
 - **Flat groups, ungroup to edit.** Simplest model that supports "move and align these as one."
+- **Marquee selects only fully enclosed sprites.** Changed 2026-11-24 at the owner's request from selecting every sprite the marquee touches. On a crowded canvas, touching selects too much; enclosure lets a drag pick out exactly the sprites meant. A group is selected only when the marquee encloses all of it, consistent with groups acting as one unit.
 - **Reference sprite = first selected.** More predictable than bounding-box alignment when snapping one image to another.
 - **Undo by snapshot.** Each operation snapshots the sprite and image-metadata arrays (small records; pixel data is never copied). Flatten is undoable because originals stay in memory until the document is saved and closed.
 - **Scale proportional by default, Shift to distort.** Image composition rarely wants distortion.
@@ -333,6 +334,7 @@ The document module has no DOM or canvas dependency. The view converts between s
 - **Moving region pixels commits on every drag.** Added 2026-11-21. Each drag is one undo step that writes a new image, rather than a floating selection held until deselected; simpler, and nothing is lost between drags because the region follows the pixels. Pixels are clipped at the image edge, keeping the move "within the image", and land as a paste (composited over) so it matches Paste.
 - **Region copy goes to the system clipboard too**, so pixels can be pasted into other applications. Pasting back into Mosaic places the pixels where they were copied from.
 - **Sprite copy goes to the system clipboard too.** Agreed 2026-11-24. Copying sprites used to fill only the internal clipboard, so an older image left on the system clipboard (a screenshot, say) won the next paste. Copy now also writes the selection as one PNG: other applications receive the combined image, and Mosaic recognises its own copy and pastes the separate sprites. Whatever was copied last wins, as users expect.
+- **Ask to save, not to discard.** Agreed 2026-11-25. Replacing a dirty document asks "Save changes?" with Save, Don't Save and Cancel, the convention of desktop editors, instead of the browser's two-button "Discard unsaved changes?" confirm, which could not offer to save. It is an HTML `<dialog>` styled with the theme, since the browser's built-in prompts have only OK and Cancel. The leave-page warning on closing the tab stays the browser's, as pages cannot change it.
 - **Text becomes an image when placed.** Agreed 2026-11-21: the owner does not need to edit text after placing it. Drawing it into a PNG leaves the document model, the `.mmsc` format and the backend unchanged, makes every existing operation work on text, and makes the file independent of installed fonts. The cost is that placed text cannot be edited, and scaling it up blurs like any image. Fonts come from a fixed list rather than the machine's full font list, which would need a permission prompt (Local Font Access API).
 - **No rotation yet.** Rotation complicates crop, alignment and flatten; deferred as a future feature.
 

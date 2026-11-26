@@ -102,6 +102,22 @@ export function createContextMenu(items, run, { formatShortcut = s => s } = {}) 
   return { open, close, isOpen: () => el.classList.contains('open') };
 }
 
+// The "Save changes?" dialog. ask(name) resolves to 'save', 'discard' or
+// 'cancel'; Escape cancels.
+export function createSaveDialog(el) {
+  const title = el.querySelector('.dialog-title');
+  return {
+    ask(name) {
+      title.textContent = `Save changes to ${name}.mmsc?`;
+      el.returnValue = '';
+      el.showModal();
+      return new Promise(resolve => {
+        el.addEventListener('close', () => resolve(el.returnValue || 'cancel'), { once: true });
+      });
+    },
+  };
+}
+
 export function createStatusBar({ zoomValue, selectionInfo, message }) {
   let timer = null;
   return {

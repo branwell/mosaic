@@ -16,6 +16,7 @@
   --checker-a: #9a9aa3;
   --checker-b: #6a6a73;
   --danger: #ff6b6b;
+  --on-accent: #ffffff;
   --font: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   color-scheme: dark;
 }
@@ -324,3 +325,36 @@ canvas.editor[data-cursor="e"], canvas.editor[data-cursor="w"] { cursor: ew-resi
 .statusbar .hint { color: var(--fg-disabled); }
 .statusbar > * { white-space: nowrap; }
 .statusbar .hint { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+
+/* ---- dialog ---- */
+
+.dialog {
+  min-width: 340px;
+  max-width: 420px;
+  padding: 18px 18px 14px;
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--fg);
+  font: inherit;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+}
+.dialog::backdrop { background: rgba(0, 0, 0, 0.4); }
+.dialog p { margin: 0; }
+.dialog .dialog-title { font-weight: 600; margin-bottom: 6px; }
+.dialog .dialog-text { color: var(--fg-muted); margin-bottom: 16px; }
+.dialog-buttons { display: flex; gap: 8px; }
+.dialog-spacer { flex: 1; }
+.dialog-buttons button {
+  background: var(--bg-hover);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--fg);
+  font: inherit;
+  padding: 4px 14px;
+  cursor: pointer;
+}
+.dialog-buttons button:hover { border-color: var(--fg-muted); }
+.dialog-buttons button.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.dialog-buttons button.primary:hover { filter: brightness(1.1); }
+.dialog-buttons button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }

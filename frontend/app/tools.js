@@ -3,7 +3,7 @@
 // a left-drag does; panning, zoom and crop mode work the same in every tool. Keyboard handling lives in main.js and calls into the
 // returned tools object.
 
-import { rectOf, rectsIntersect } from './document.js';
+import { rectOf, rectInside } from './document.js';
 import { cropPixels, clearedCanvas } from './raster.js';
 import { canvasToRegionPoint, regionFits, regionToCanvas, visibleSource, movedRegion, moveRegion } from './region.js';
 
@@ -292,7 +292,11 @@ export function attachTools(canvas, doc, view, { onContextMenu = () => {}, backg
         const m = view.overlay.marquee;
         view.overlay.marquee = null;
         if (m) {
-          const ids = doc.sprites.filter(s => rectsIntersect(rectOf(s), m)).map(s => s.id);
+          // Only sprites fully inside the marquee; a group only when all of
+          // its members are.
+          const ids = doc.sprites
+            .filter(s => doc.unitOf(s.id).every(id => rectInside(rectOf(doc.sprite(id)), m)))
+            .map(s => s.id);
           if (d.additive) doc.addToSelection(ids); else doc.setSelection(ids);
         } else {
           doc.emit();

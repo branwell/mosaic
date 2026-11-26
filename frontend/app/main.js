@@ -9,7 +9,7 @@ import * as files from './files.js';
 import * as region from './region.js';
 import { decodeImage, renderSprites, toPngBlob } from './raster.js';
 import { attachTextEditor } from './text.js';
-import { createMenuBar, createContextMenu, createStatusBar } from './menu.js';
+import { createMenuBar, createContextMenu, createStatusBar, createSaveDialog } from './menu.js';
 import { buildKeymap, eventKeyName, formatKey, stripModifiers } from './keys.js';
 
 const doc = new Document();
@@ -30,6 +30,7 @@ const status = createStatusBar({
   selectionInfo: document.getElementById('selection-info'),
   message: document.getElementById('message'),
 });
+const saveDialog = createSaveDialog(document.getElementById('save-dialog'));
 
 // Internal clipboard: {kind: 'sprites', records} or {kind: 'pixels', image,
 // rect} (see region.copyRegion), or null.
@@ -76,8 +77,14 @@ function spriteSummary(s) {
 
 // ---- actions ----
 
-function confirmDiscard() {
-  return !doc.dirty || window.confirm('Discard unsaved changes?');
+// Before replacing a dirty document, offer to save it. Resolves true when it
+// is safe to go on. Cancelling the dialog or the Save As picker stops here.
+async function confirmDiscard() {
+  if (!doc.dirty) return true;
+  const answer = await saveDialog.ask(doc.name);
+  if (answer === 'cancel') return false;
+  if (answer === 'save') await files.saveFile(doc);
+  return true;
 }
 
 async function importFromPicker() {
@@ -97,8 +104,8 @@ const singleUngrouped = () => {
 };
 
 const actions = {
-  new: () => { if (confirmDiscard()) doc.reset(); },
-  open: async () => { if (confirmDiscard()) await files.openFile(doc); },
+  new: async () => { if (await confirmDiscard()) doc.reset(); },
+  open: async () => { if (await confirmDiscard()) await files.openFile(doc); },
   save: () => files.saveFile(doc),
   saveAs: () => files.saveFile(doc, { as: true }),
   import: importFromPicker,
@@ -238,7 +245,7 @@ const menus = [
     item('New', 'new'), // browsers reserve Ctrl/Cmd+N for a new window
     item('Open…', 'open'),
     { label: 'Open Recent', submenu: async () => (await files.listRecent()).map(r => ({
-      label: r.name, action: async () => { if (confirmDiscard()) await files.openFile(doc, r.handle); },
+      label: r.name, action: async () => { if (await confirmDiscard()) await files.openFile(doc, r.handle); },
     })) },
     'sep',
     item('Save', 'save'),
@@ -342,7 +349,10 @@ const panKey = keys.held.get('pan') || null;
 const TEXT_FIELD_ACTIONS = new Set(['undo', 'redo', 'cut', 'copy', 'paste', 'selectAll', 'delete']);
 const isField = el => el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || el instanceof HTMLSelectElement;
 
+const dialogOpen = () => !!document.querySelector('dialog[open]');
+
 window.addEventListener('keydown', e => {
+  if (dialogOpen()) return; // the dialog handles its own keys
   const name = eventKeyName(e);
   if (isField(e.target)) {
     // In the text box, other Ctrl shortcuts (Save, Export…) place the text
@@ -372,7 +382,7 @@ window.addEventListener('blur', () => tools.setSpace(false));
 // ---- clipboard and drag-drop import ----
 
 document.addEventListener('paste', e => {
-  if (isField(e.target)) return; // plain text pasted into the text box
+  if (isField(e.target) || dialogOpen()) return; // plain text pasted into the text box
   const images = files.imageFilesFromDataTransfer(e.clipboardData);
   if (images.length) {
     e.preventDefault();
